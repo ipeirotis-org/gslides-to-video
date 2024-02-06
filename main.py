@@ -8,6 +8,7 @@ from google.cloud import storage, firestore
 
 from voice_generation import get_audio_from_text
 from video import create_video
+from gslides import extract_slide_images, extract_speaker_notes_to_mp3
 
 # Define constants for service accounts and scopes
 SERVICE_ACCOUNT_FILE = "gslides-to-video.json"
@@ -25,52 +26,14 @@ def initialize_google_services():
     return slides_service, storage_client, firestore_client
 
 
-def slide_to_image(slides_service, presentation_id, slide_id, filename):
-    response = (
-        slides_service.presentations().pages().getThumbnail(presentationId=presentation_id, pageObjectId=slide_id).execute()
-    )
-    url = response["contentUrl"]
-    image_data = requests.get(url).content
-    with open(filename, "wb") as handler:
-        handler.write(image_data)
+def process_presentation(slides_service, presentation_id, output_dir):
+    # Extract images from slides
+    extract_slide_images(slides_service, presentation_id, output_dir)
 
+    # Optionally specify a voice for MP3 extraction
+    voice = "panos"
+    extract_speaker_notes_to_mp3(slides_service, presentation_id, output_dir, voice)
 
-def find_keys(target_key, dictionary, results=None):
-    if results is None:
-        results = []
-    for key, value in dictionary.items():
-        if key == target_key:
-            results.append(value)
-        elif isinstance(value, dict):
-            find_keys(target_key, value, results)
-        elif isinstance(value, list):
-            for item in value:
-                if isinstance(item, dict):
-                    find_keys(target_key, item, results)
-    return results
-
-
-def get_speaker_notes(slides_service, presentation_id, slide_id):
-    slide = slides_service.presentations().pages().get(presentationId=presentation_id, pageObjectId=slide_id).execute()
-    notes = slide.get("slideProperties").get("notesPage")
-    content = find_keys("content", notes)
-    return "\n".join(content)
-
-
-def extract_slides_and_text(slides_service, presentation_id, output_dir):
-    presentation = slides_service.presentations().get(presentationId=presentation_id).execute()
-    slides = presentation["slides"]
-    slide_ids = [(slide["objectId"], i) for i, slide in enumerate(slides)]
-    for slide_id, i in tqdm(slide_ids):
-        img_filename = os.path.join(output_dir, f"slide_{i}.png")
-        slide_to_image(slides_service, presentation_id, slide_id, img_filename)
-        speaker_notes = get_speaker_notes(slides_service, presentation_id, slide_id)
-        if speaker_notes.strip():
-            filename = os.path.join(output_dir, f"slide_{i}.mp3")
-            if not os.path.exists(filename):
-                # Assuming get_audio_from_text() is defined elsewhere
-                voice = "panos"
-                get_audio_from_text(voice, speaker_notes, filename)
 
 
 def upload_to_bucket(storage_client, blob_name, file_path, bucket_name):
@@ -92,8 +55,8 @@ def main(presentation_id):
     output_folder = f"./content/slides/output/{title}/{presentation_id}"
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
-    extract_slides_and_text(slides_service, presentation_id, output_folder)
-    # Assuming create_video is defined to accept slides_service as a parameter
+    process_presentation(slides_service, presentation_id, output_folder)
+
     output_file = "output_video.mp4"
     create_video(slides_service, presentation_id, output_folder, output_file)
     video_path = os.path.join(output_folder, output_file)
