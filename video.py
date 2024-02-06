@@ -47,4 +47,4 @@ def create_video(slides_service, presentation_id, output_dir, output_file):
     interleaved = list(chain.from_iterable(zip(clips, transitions))) + [clips[-1]]
 
     final_clip = concatenate_videoclips(interleaved, method="chain")
-    final_clip.write_videofile(f"{output_dir}/final_video.mp4", codec="libx264", threads=32, fps=24)
+    final_clip.write_videofile(f"{output_dir}/{output_file}", codec="libx264", threads=32, fps=24)

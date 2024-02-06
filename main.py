@@ -4,37 +4,13 @@ from tqdm import tqdm
 import requests
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from google.cloud import storage, firestore
 
-from voice_generation import get_audio_from_text
+
 from video import create_video
+from voice_generation import get_voices
 from gslides import extract_slide_images, extract_speaker_notes_to_mp3
 
-# Define constants for service accounts and scopes
-SERVICE_ACCOUNT_FILE = "gslides-to-video.json"
-SCOPES = [
-    "https://www.googleapis.com/auth/presentations.readonly",
-    "https://www.googleapis.com/auth/drive",
-]
-
-
-def initialize_google_services():
-    credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE)
-    slides_service = build("slides", "v1", credentials=credentials)
-    storage_client = storage.Client(credentials=credentials)
-    firestore_client = firestore.Client(credentials=credentials)
-    return slides_service, storage_client, firestore_client
-
-
-def process_presentation(slides_service, presentation_id, output_dir):
-    # Extract images from slides
-    extract_slide_images(slides_service, presentation_id, output_dir)
-
-    # Optionally specify a voice for MP3 extraction
-    voice = "panos"
-    extract_speaker_notes_to_mp3(slides_service, presentation_id, output_dir, voice)
-
-
+from google_services import initialize_google_services
 
 def upload_to_bucket(storage_client, blob_name, file_path, bucket_name):
     bucket = storage_client.bucket(bucket_name)
@@ -49,23 +25,34 @@ def add_firestore_entry(firestore_client, presentation_id, metadata):
 
 
 def main(presentation_id):
-    slides_service, storage_client, firestore_client = initialize_google_services()
+    slides_service, storage_client, firestore_client, _, _ = initialize_google_services()
     presentation = slides_service.presentations().get(presentationId=presentation_id).execute()
     title = presentation.get("title")
-    output_folder = f"./content/slides/output/{title}/{presentation_id}"
+
+    voice = "michael"
+    voice_id = get_voices().get(voice).voice_id
+    output_folder = f"./content/slides/output/{title}/{presentation_id}/{voice_id}"
+    output_file = "output_video.mp4"
+    video_path = os.path.join(output_folder, output_file)  
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
-    process_presentation(slides_service, presentation_id, output_folder)
+    
+    # Extract images from slides
+    extract_slide_images(slides_service, presentation_id, output_folder)
 
-    output_file = "output_video.mp4"
+    # Optionally specify a voice for MP3 extraction
+    extract_speaker_notes_to_mp3(slides_service, presentation_id, output_folder, voice)
+    
     create_video(slides_service, presentation_id, output_folder, output_file)
-    video_path = os.path.join(output_folder, output_file)
+    
     bucket_name = "gslide_videos"
-    video_url = upload_to_bucket(storage_client, f"{title}/{presentation_id}/{output_file}", video_path, bucket_name)
+    video_url = upload_to_bucket(storage_client, f"videos/{title}--{presentation_id}/{voice_id}--{voice}/{output_file}", video_path, bucket_name)
     metadata = {
         "title": title,
         "presentation_id": presentation_id,
         "video_url": video_url,
+        "voice_id": voice_id,
+        "voice": voice
     }
     add_firestore_entry(firestore_client, presentation_id, metadata)
 

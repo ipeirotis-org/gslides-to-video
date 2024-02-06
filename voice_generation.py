@@ -1,18 +1,17 @@
-from elevenlabs import set_api_key, generate, Voice, VoiceSettings
+import elevenlabs 
+from elevenlabs import Voice, VoiceSettings
 from google.cloud import firestore, storage
 import hashlib
-from get_secrets import access_secret_version
+from google_services import access_secret_version, initialize_google_services
 from google.oauth2 import service_account
 
+
 # Initialize Google Cloud services
-SERVICE_ACCOUNT_FILE = "gslides-to-video.json"
-credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE)
-storage_client = storage.Client(credentials=credentials)
-db = firestore.Client(credentials=credentials)
+_, storage_client, firestore_client, secrets_client, _ = initialize_google_services()
 
-
-ELEVEN_LABS_KEY = access_secret_version("elevenlabs_api_key")
-set_api_key(ELEVEN_LABS_KEY)
+# Initialize ElevenLabs
+ELEVEN_LABS_KEY = access_secret_version(secrets_client, "elevenlabs_api_key")
+elevenlabs.set_api_key(ELEVEN_LABS_KEY)
 
 
 bucket_name = "gslide_videos"
@@ -32,7 +31,11 @@ def get_voices():
         settings=VoiceSettings(stability=0.5, similarity_boost=1.0, style=0.4, use_speaker_boost=True),
     )
 
-    return {"panos": panos, "foster": foster, "michael": "Michael"}
+    michael = Voice(
+        voice_id="flq6f7yk4E4fJM5XTYuZ",
+    )
+
+    return {"panos": panos, "foster": foster, "michael": michael}
 
 
 # Function to generate MD5 hash
@@ -41,10 +44,10 @@ def generate_md5_hash(text):
 
 
 # Check if file exists in Google Cloud Storage
-def file_exists_in_gcs(md5_hash):
+def file_exists_in_gcs(voice_id, md5_hash):
     blobs = storage_client.list_blobs(bucket_name)
     for blob in blobs:
-        if md5_hash in blob.name:
+        if md5_hash in blob.name and voice_id in blob.name:
             return True, "gs://{}/{}".format(bucket_name, blob.name)
     return False, None
 
@@ -59,7 +62,7 @@ def save_file_to_gcs(audio, md5_hash, voice_id):
 
 # Save metadata to Firestore
 def save_metadata_to_firestore(md5_hash, voice_id, file_path, clip_length):
-    doc_ref = db.collection("audio_files").document(md5_hash)
+    doc_ref = firestore_client.collection("audio_files").document(md5_hash)
     doc_ref.set(
         {
             "md5_hash": md5_hash,
@@ -77,15 +80,18 @@ def get_audio_from_text(voice, text, outputfile):
     chosen_voice = voices[voice]
 
     md5_hash = generate_md5_hash(text)
-    exists, file_path = file_exists_in_gcs(md5_hash)
+    exists, file_path = file_exists_in_gcs(md5_hash, chosen_voice.voice_id)
 
     if exists:
         print(f"File already exists: {file_path}")
-        # Optionally, download the file from GCS to outputfile here
+        # Download the file from GCS to outputfile
+        blob = bucket.blob(file_path.replace(f"gs://{bucket_name}/", ""))
+        blob.download_to_filename(outputfile)
+        print(f"File downloaded to: {outputfile}")
         return
 
     # API call to ElevenLabs to get the voice
-    audio = generate(
+    audio = elevenlabs.generate(
         text=text,
         voice=chosen_voice,
         model="eleven_monolingual_v1",
