@@ -29,7 +29,8 @@ def main(presentation_id):
     presentation = slides_service.presentations().get(presentationId=presentation_id).execute()
     title = presentation.get("title")
 
-    voice = "michael"
+    # voice = "michael"
+    voice = "panos"
     voice_id = get_voices().get(voice).voice_id
     output_folder = f"./content/slides/output/{title}/{presentation_id}/{voice_id}"
     output_file = "output_video.mp4"
@@ -50,11 +51,13 @@ def main(presentation_id):
     metadata = {
         "title": title,
         "presentation_id": presentation_id,
+        "upload_time": firestore.SERVER_TIMESTAMP,
         "video_url": video_url,
         "voice_id": voice_id,
-        "voice": voice
+        "voice": voice,
+        "additional_metadata": {},
     }
-    add_firestore_entry(firestore_client, presentation_id, metadata)
+    add_firestore_entry(firestore_client, f"{presentation_id}--{voice_id}", metadata)
 
 
 if __name__ == "__main__":

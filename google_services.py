@@ -14,8 +14,8 @@ VERSION_ID = "latest"
 def initialize_google_services():
     credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE)
     slides_service = build("slides", "v1", credentials=credentials)
-    storage_client = storage.Client(credentials=credentials)
-    firestore_client = firestore.Client(credentials=credentials)
+    storage_client = storage.Client(credentials=credentials, project=PROJECT_ID)
+    firestore_client = firestore.Client(credentials=credentials, project=PROJECT_ID)
     secrets_client = secretmanager.SecretManagerServiceClient(credentials=credentials)
     gdrive_service = build("drive", "v3", credentials=credentials)
     return slides_service, storage_client, firestore_client, secrets_client, gdrive_service
