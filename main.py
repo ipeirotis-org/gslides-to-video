@@ -25,20 +25,39 @@ def add_firestore_entry(firestore_client, presentation_id, metadata):
 
 
 def main(presentation_id):
+    '''
+    The function gets as input the "presentation id" from Google slides.
+
+    The presentation ID is part of the URL. For example, for the presentation at
+    https://docs.google.com/presentation/d/1BgL7sTbfrOa2vSwgDF14pWyx6URWdMqrE1JJrhV9Wjw/edit#slide=id.p1
+
+    the presentation ID is "1BgL7sTbfrOa2vSwgDF14pWyx6URWdMqrE1JJrhV9Wjw"
+
+    For the program to access the presentation, the presentation needs to be shared
+    with github@gslides-to-video.iam.gserviceaccount.com 
+    '''
+    
+    # We setup all the google services necessary
     slides_service, storage_client, firestore_client, _, _ = initialize_google_services()
+
+    # This gives us programmatic access to the slides
     presentation = slides_service.presentations().get(presentationId=presentation_id).execute()
     title = presentation.get("title")
 
-    # voice = "michael"
+    # Here we define which ElevenLabs voice we want to use
+    # TODO: Make this a parameter from the command line
     voice = "panos"
     voice_id = get_voices().get(voice).voice_id
+
+    # We will save all the output in the local folder under content
+    # and we will also mirror everything to a Google Bucket
     output_folder = f"./content/slides/output/{title}/{presentation_id}/{voice_id}"
     output_file = "output_video.mp4"
     video_path = os.path.join(output_folder, output_file)  
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
     
-    # Extract images from slides
+    # Extract images from slides and saves them as images under the output folder
     extract_slide_images(slides_service, presentation_id, output_folder)
 
     # Optionally specify a voice for MP3 extraction
@@ -62,7 +81,7 @@ def main(presentation_id):
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python script.py <presentation_id>")
+        print("Usage: python main.py <presentation_id>")
         sys.exit(1)
     presentation_id = sys.argv[1]
     main(presentation_id)

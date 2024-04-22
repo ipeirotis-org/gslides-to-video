@@ -34,6 +34,10 @@ def get_speaker_notes(slides_service, presentation_id, slide_id):
     
 
 def extract_slide_images(slides_service, presentation_id, output_dir):
+    '''
+    Creates PNG files that correspond to the slides of the presentation
+    and saves them under the output_dir
+    '''
     presentation = slides_service.presentations().get(presentationId=presentation_id).execute()
     slides = presentation["slides"]
     slide_ids = [(slide["objectId"], i) for i, slide in enumerate(slides)]

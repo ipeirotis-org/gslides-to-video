@@ -4,7 +4,7 @@ from google.cloud import firestore, storage
 import hashlib
 from google_services import access_secret_version, initialize_google_services
 from google.oauth2 import service_account
-
+from utils import generate_md5_hash, file_exists_in_gcs, save_file_to_gcs
 
 # Initialize Google Cloud services
 _, storage_client, firestore_client, secrets_client, _ = initialize_google_services()
@@ -38,26 +38,6 @@ def get_voices():
     return {"panos": panos, "foster": foster, "michael": michael}
 
 
-# Function to generate MD5 hash
-def generate_md5_hash(text):
-    return hashlib.md5(text.encode()).hexdigest()
-
-
-# Check if file exists in Google Cloud Storage
-def file_exists_in_gcs(voice_id, md5_hash):
-    blobs = storage_client.list_blobs(bucket_name)
-    for blob in blobs:
-        if md5_hash in blob.name and voice_id in blob.name:
-            return True, "gs://{}/{}".format(bucket_name, blob.name)
-    return False, None
-
-
-# Save file to Google Cloud Storage
-def save_file_to_gcs(audio, md5_hash, voice_id):
-    file_path = f"audio/{voice_id}/{md5_hash}.mp3"
-    blob = bucket.blob(file_path)
-    blob.upload_from_string(audio, content_type="audio/mpeg")
-    return f"gs://{bucket_name}/{file_path}"
 
 
 # Save metadata to Firestore
@@ -98,7 +78,7 @@ def get_audio_from_text(voice, text, outputfile):
     )
 
     # Save the audio to Google Cloud Storage
-    gcs_path = save_file_to_gcs(audio, md5_hash, chosen_voice.voice_id)
+    gcs_path = save_file_to_gcs(audio, md5_hash)
 
     # Save metadata to Firestore
     save_metadata_to_firestore(md5_hash, chosen_voice.voice_id, gcs_path, clip_length=0)  # Update clip_length appropriately

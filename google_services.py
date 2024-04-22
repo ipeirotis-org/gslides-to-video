@@ -1,15 +1,7 @@
-from google.cloud import secretmanager
+from google.cloud import firestore, storage, secretmanager
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from google.cloud import storage, firestore
-
-# Path to your service account key file
-SERVICE_ACCOUNT_FILE = "gslides-to-video.json"
-
-# Define constants for service accounts and scopes
-PROJECT_ID = "gslides-to-video"
-VERSION_ID = "latest"
-
+from config import PROJECT_ID, SERVICE_ACCOUNT_FILE
 
 def initialize_google_services():
     credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE)
@@ -20,13 +12,10 @@ def initialize_google_services():
     gdrive_service = build("drive", "v3", credentials=credentials)
     return slides_service, storage_client, firestore_client, secrets_client, gdrive_service
 
-
-def access_secret_version(secrets_client, secret_id):
-    name = f"projects/{PROJECT_ID}/secrets/{secret_id}/versions/{VERSION_ID}"
+def access_secret_version(secrets_client, secret_id, version_id="latest"):
+    name = f"projects/{PROJECT_ID}/secrets/{secret_id}/versions/{version_id}"
     response = secrets_client.access_secret_version(request={"name": name})
     return response.payload.data.decode("UTF-8")
-
-
 
 def list_google_slides():
     _, _, _, _, service = initialize_google_services()
