@@ -72,7 +72,7 @@ def create_video(slides_service, presentation_id, output_dir, output_file):
 
     md5hash = generate_combined_md5(files)
 
-    exists, file_path =  file_exists_in_gcs(md5_hash)
+    exists, file_path =  file_exists_in_gcs(md5hash)
     if exists:
         print(f"File already exists: {file_path}")
         # Download the file from GCS to outputfile
