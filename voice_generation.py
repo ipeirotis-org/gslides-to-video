@@ -78,10 +78,11 @@ def get_audio_from_text(voice, text, outputfile):
     )
 
     # Save the audio to Google Cloud Storage
-    gcs_path = save_file_to_gcs(audio, md5_hash)
+    gcs_path = save_file_to_gcs(audio, md5_hash,chosen_voice.voice_id)
 
     # Save metadata to Firestore
-    save_metadata_to_firestore(md5_hash, chosen_voice.voice_id, gcs_path, clip_length=0)  # Update clip_length appropriately
+    # TODO: Update clip_length appropriately
+    save_metadata_to_firestore(md5_hash, chosen_voice.voice_id, gcs_path, clip_length=0)  
 
     # Save the audio to a file locally (optional)
     with open(outputfile, "wb") as f:

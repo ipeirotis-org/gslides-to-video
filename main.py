@@ -4,7 +4,7 @@ from tqdm import tqdm
 import requests
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-
+from google.cloud import firestore
 
 from video import create_video
 from voice_generation import get_voices
@@ -51,22 +51,25 @@ def main(presentation_id):
 
     # We will save all the output in the local folder under content
     # and we will also mirror everything to a Google Bucket
-    output_folder = f"./content/slides/output/{title}/{presentation_id}/{voice_id}"
-    output_file = "output_video.mp4"
-    video_path = os.path.join(output_folder, output_file)  
-    if not os.path.exists(output_folder):
-        os.makedirs(output_folder)
+    output_path = f"{title}--{presentation_id}/{voice}--{voice_id}"
+    local_folder = f"./output/{output_path}"
+    if not os.path.exists(local_folder):
+        os.makedirs(local_folder)
     
     # Extract images from slides and saves them as images under the output folder
-    extract_slide_images(slides_service, presentation_id, output_folder)
+    extract_slide_images(slides_service, presentation_id, local_folder)
 
-    # Optionally specify a voice for MP3 extraction
-    extract_speaker_notes_to_mp3(slides_service, presentation_id, output_folder, voice)
-    
-    create_video(slides_service, presentation_id, output_folder, output_file)
+    # Create the audio files
+    extract_speaker_notes_to_mp3(slides_service, presentation_id, local_folder, voice)
+
+    video_filename, md5hash = create_video(slides_service, presentation_id, local_folder)
     
     bucket_name = "gslide_videos"
-    video_url = upload_to_bucket(storage_client, f"videos/{title}--{presentation_id}/{voice_id}--{voice}/{output_file}", video_path, bucket_name)
+    video_filename_gcs = f"{output_path}/video/output_video-{md5hash}.mp4"
+    local_video_path = f"{local_folder}/output_video-{md5hash}.mp4"
+    
+    video_url = upload_to_bucket(storage_client, video_filename_gcs, local_video_path, bucket_name)
+    
     metadata = {
         "title": title,
         "presentation_id": presentation_id,

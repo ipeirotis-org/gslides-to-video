@@ -39,7 +39,7 @@ def file_exists_in_gcs(md5_hash):
 
 
 
-def create_video(slides_service, presentation_id, output_dir, output_file):
+def create_video(slides_service, presentation_id, output_dir):
     presentation = slides_service.presentations().get(presentationId=presentation_id).execute()
     slides = presentation["slides"]
     slide_count = len(slides)  # This should be the number of slides you have
@@ -72,13 +72,14 @@ def create_video(slides_service, presentation_id, output_dir, output_file):
 
     md5hash = generate_combined_md5(files)
 
+    output_file = f"output_video-{md5hash}.mp4"
     exists, file_path =  file_exists_in_gcs(md5hash)
     if exists:
         print(f"File already exists: {file_path}")
         # Download the file from GCS to outputfile
         blob = bucket.blob(file_path.replace(f"gs://{bucket_name}/", ""))
-        blob.download_to_filename(outputfile)
-        print(f"File downloaded to: {outputfile}")
+        blob.download_to_filename(output_file)
+        print(f"File downloaded to: {output_file}")
 
     # Add cross-fade transitions between each pair of clips
     transitions = []
@@ -96,8 +97,8 @@ def create_video(slides_service, presentation_id, output_dir, output_file):
     # Export the video
     interleaved = list(chain.from_iterable(zip(clips, transitions))) + [clips[-1]]
 
-    filename = f"gs://{bucket_name}/{output_dir}/{output_file}-{md5hash}.mp4"
+    filename = f"{output_dir}/{output_file}"
     final_clip = concatenate_videoclips(interleaved, method="chain")
-    final_clip.write_videofile(f"{output_dir}/{md5hash}.mp4", codec="libx264", threads=32, fps=24)
+    final_clip.write_videofile(filename, codec="libx264", threads=32, fps=24)
 
-    return filename
+    return filename, md5hash

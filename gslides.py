@@ -1,5 +1,5 @@
-from tqdm import tqdm
 import os
+from tqdm import tqdm
 import requests
 from voice_generation import get_audio_from_text
 
